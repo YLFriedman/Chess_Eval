@@ -1,0 +1,5 @@
+*.csv
+*.parquet
+*.pth
+.ipynb_checkpoints/
+__pycache__/
