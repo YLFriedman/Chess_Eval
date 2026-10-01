@@ -5,7 +5,7 @@ import gc
 from torch.utils.data import random_split
 from dataset import ChessDataset
 from models.cnn import ChessCNN
-from models.mlp import TwoLayerChessMLP
+from models.mlp import TwoLayerMLP, ThreeLayerMLP
 
 PIECES = ['P', 'N', 'B', 'R', 'K', 'Q', 'p', 'n', 'b', 'r', 'k', 'q']
 CASTLING = ['K', 'Q', 'k', 'q']
@@ -91,9 +91,9 @@ def get_chess_datasets(data_path, val_size=500_000, test_size=500_000, seed=42):
 
 
 def model_from_checkpoint(checkpoint):
-    def_model = TwoLayerChessMLP(layer1_width=1024, layer2_width=512)
+    def_model = TwoLayerMLP(layer1_width=1024, layer2_width=512)
     def_config = {
-        'model_type': 'TwoLayerChessMLP',
+        'model_type': 'TwoLayerMLP',
         'layer1_width': 1024,
         'layer2_width': 512,
         'dropout_rate': 0.2
@@ -103,9 +103,12 @@ def model_from_checkpoint(checkpoint):
             config = checkpoint.get('model_config', {})
             # Remove 'model_type' before unpacking the kwargs   
             kwargs = {k: v for k, v in config.items() if k != 'model_type'}
-            if config.get('model_type') == 'TwoLayerChessMLP':                    
-                return TwoLayerChessMLP(**kwargs), config
-    
+            if config.get('model_type') == 'TwoLayerMLP':                    
+                return TwoLayerMLP(**kwargs), config
+            
+            elif config.get('model_type') == 'ThreeLayerMLP':
+                return ThreeLayerMLP(**kwargs), config 
+            
             elif config.get('model_type') == 'ChessCNN':
                 return ChessCNN(**kwargs), config
     else:

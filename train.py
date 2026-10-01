@@ -4,7 +4,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 import time
 
-from models.mlp import ChessMLP, TwoLayerChessMLP
+from models.mlp import ChessMLP, TwoLayerMLP, ThreeLayerMLP
 from utils import get_chess_datasets, custom_collate, model_from_checkpoint
 
 def main():
@@ -72,12 +72,13 @@ def main():
             print("Error resuming from checkpoint, beginning at Epoch 0")
     else:
         model_config = {
-        'model_type': 'TwoLayerChessMLP',
-        'layer1_width': 1024,
-        'layer2_width': 512,
+        'model_type': 'ThreeLayerMLP',
+        'layer1_width': 2048,
+        'layer2_width': 1024,
+        'layer3_width' : 256,
         'dropout_rate': 0.2
         }
-        model = TwoLayerChessMLP(**{k: v for k, v in model_config.items() if k != 'model_type'})
+        model = ThreeLayerMLP(**{k: v for k, v in model_config.items() if k != 'model_type'})
 
 
         model.to(device)

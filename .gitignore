@@ -8,3 +8,4 @@ checkpoints/
 __pycache__/
 .idea/
 .vscode/
+*.xlsx

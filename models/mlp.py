@@ -15,7 +15,7 @@ class ChessMLP(nn.Module):
         x = self.flatten(x)
         return self.network(x)
 
-class TwoLayerChessMLP(nn.Module):
+class TwoLayerMLP(nn.Module):
     def __init__(self, layer1_width=1024, layer2_width=512, dropout_rate=0.2):
         super().__init__()
         
@@ -35,6 +35,36 @@ class TwoLayerChessMLP(nn.Module):
             
             # Output Layer (Single centipawn evaluation)
             nn.Linear(layer2_width, 1)
+        )
+
+    def forward(self, x):
+        return self.network(x)
+
+class ThreeLayerMLP(nn.Module):
+    def __init__(self, layer1_width=1024, layer2_width=512, layer3_width = 256, dropout_rate=0.2):
+        super().__init__()
+        
+        # Input tensor is (Batch, 18, 8, 8) -> flattened to 1152
+        self.network = nn.Sequential(
+            nn.Flatten(),
+            
+            # Layer 1
+            nn.Linear(1152, layer1_width),
+            nn.ReLU(),
+            nn.Dropout(dropout_rate),
+            
+            # Layer 2
+            nn.Linear(layer1_width, layer2_width),
+            nn.ReLU(),
+            nn.Dropout(dropout_rate),
+
+            # Layer 3
+            nn.Linear(layer2_width, layer3_width),
+            nn.ReLU(),
+            nn.Dropout(dropout_rate),
+            
+            # Output Layer (Single centipawn evaluation)
+            nn.Linear(layer3_width, 1)
         )
 
     def forward(self, x):

@@ -5,7 +5,7 @@ import argparse
 import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader
 
-from models.mlp import ChessMLP, TwoLayerChessMLP
+from models.mlp import ChessMLP, TwoLayerMLP
 from models.cnn import ChessCNN
 from utils import get_chess_datasets, custom_collate, model_from_checkpoint
 
@@ -28,9 +28,8 @@ def plot_loss(train_losses, val_losses, figpath):
 def main():
 
     parser = argparse.ArgumentParser(description="Train ChessMLP")
-    parser.add_argument("--figpath", type=str, default='figures/loss_curve.png', help="Path to save loss curve image to")
-    parser.add_argument("--checkpoint", type=str, default='checkpoints/', help="Path to checkpointfolder")
-    parser.add_argument("--model", type=str, default='TwoLayerChessMLP', help="model to evaluate")
+    parser.add_argument("--figpath", type=str, default='loss_curve.png', help="file to save loss curve image to")
+    parser.add_argument("--checkpoint", type=str, default='ThreeLayerMLP_best_model.pth', help="name of checkpoint file")
     args = parser.parse_args()
 
 
@@ -52,7 +51,7 @@ def main():
     # 2. Load the trained model
     
     print("Loading checkpoint...")
-    checkpoint = torch.load(f"{args.checkpoint}{args.model}_best_model.pth", map_location=device, weights_only=False)
+    checkpoint = torch.load(f'checkpoints/{args.checkpoint}', map_location=device, weights_only=False)
     model, _ = model_from_checkpoint(checkpoint)
 
     criterion = nn.MSELoss()
@@ -89,7 +88,7 @@ def main():
     
     if train_history and val_history:
         print("\nGenerating loss curve graph...")
-        plot_loss(train_history, val_history, args.figpath)
+        plot_loss(train_history, val_history, f'figures/{args.figpath}')
     else:
         print("\nNo loss history found in checkpoint to plot.")
 
