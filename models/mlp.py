@@ -56,12 +56,14 @@ class ThreeLayerMLP(nn.Module):
             # Layer 2
             nn.Linear(layer1_width, layer2_width),
             nn.ReLU(),
-            nn.Dropout(dropout_rate),
+            nn.Dropout(dropout_rate/2),
 
             # Layer 3
+            # No dropout as we approach final output
             nn.Linear(layer2_width, layer3_width),
             nn.ReLU(),
-            nn.Dropout(dropout_rate),
+            
+
             
             # Output Layer (Single centipawn evaluation)
             nn.Linear(layer3_width, 1)

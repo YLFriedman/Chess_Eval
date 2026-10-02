@@ -1,8 +1,10 @@
 import torch
 import numpy as np
 import pandas as pd
+
 import gc
-from torch.utils.data import random_split
+import xlsxwriter
+from torch.utils.data import random_split, DataLoader
 from dataset import ChessDataset
 from models.cnn import ChessCNN
 from models.mlp import TwoLayerMLP, ThreeLayerMLP
@@ -114,3 +116,24 @@ def model_from_checkpoint(checkpoint):
     else:
         # Fallback for old checkpoint
         return def_model, def_config
+
+
+def get_data_loaders(data, batch_size):
+    train_dataset, val_dataset, _ = get_chess_datasets(data)
+
+    train_loader = DataLoader(
+        train_dataset, batch_size=batch_size, shuffle=True, 
+        num_workers=4, pin_memory=True, collate_fn=custom_collate
+        )
+    val_loader = DataLoader(
+        val_dataset, batch_size=4096, shuffle=False, 
+        num_workers=4, pin_memory=True, collate_fn=custom_collate
+        )
+    return train_loader, val_loader
+
+def write_record(checkpoint, tests_error):
+
+    config = [checkpoint.get('model_config')]
+    
+    print(df.shape)
+
