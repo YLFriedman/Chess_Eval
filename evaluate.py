@@ -5,8 +5,6 @@ import argparse
 import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader
 
-from models.mlp import ChessMLP, TwoLayerMLP
-from models.cnn import ChessCNN
 from utils import get_chess_datasets, custom_collate, model_from_checkpoint
 
 def plot_loss(train_losses, val_losses, figpath):
@@ -27,11 +25,10 @@ def plot_loss(train_losses, val_losses, figpath):
 
 def main():
 
-    parser = argparse.ArgumentParser(description="Train ChessMLP")
+    parser = argparse.ArgumentParser(description="Evaluate Chess Model")
     parser.add_argument("--figpath", type=str, default='loss_curve.png', help="file to save loss curve image to")
     parser.add_argument("--checkpoint", type=str, default='ThreeLayerMLP_best_model.pth', help="name of checkpoint file")
     args = parser.parse_args()
-
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     print(f"Using device: {device}")
@@ -48,15 +45,13 @@ def main():
         collate_fn=custom_collate
     )
 
-    # 2. Load the trained model
-    
+    # 2. Load the trained model via State object
     print("Loading checkpoint...")
     checkpoint = torch.load(f'checkpoints/{args.checkpoint}', map_location=device, weights_only=False)
-    model, _ = model_from_checkpoint(checkpoint)
+    state = model_from_checkpoint(checkpoint, device)
 
+    model = state.model
     criterion = nn.MSELoss()
-    model.to(device)
-    model.load_state_dict(checkpoint['model_state_dict'])
     model.eval()
 
     # 3. Evaluate Test Data
@@ -83,8 +78,8 @@ def main():
     print(f"Test RMSE: {test_rmse:.5f} (~{test_rmse * 1000:.1f} centipawns)")
 
     # 4. Plot the Loss Curve
-    train_history = checkpoint.get('train_loss_history', [])
-    val_history = checkpoint.get('val_loss_history', [])
+    train_history = state.train_history
+    val_history = state.val_history
     
     if train_history and val_history:
         print("\nGenerating loss curve graph...")

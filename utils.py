@@ -1,16 +1,45 @@
 import torch
 import numpy as np
 import pandas as pd
-
 import gc
-import xlsxwriter
+from dataclasses import dataclass, field
 from torch.utils.data import random_split, DataLoader
+
 from dataset import ChessDataset
 from models.cnn import ChessCNN
 from models.mlp import TwoLayerMLP, ThreeLayerMLP
 
 PIECES = ['P', 'N', 'B', 'R', 'K', 'Q', 'p', 'n', 'b', 'r', 'k', 'q']
 CASTLING = ['K', 'Q', 'k', 'q']
+
+DEFAULT_CONFIG = {
+    'model_type': 'ThreeLayerMLP',
+    'layer1_width': 2048,
+    'layer2_width': 1024,
+    'layer3_width' : 256,
+    'dropout_rate': 0.2
+}
+
+DEFAULT_SCHEDULER = {
+    'mode': 'min', 
+    'factor': 0.5, 
+    'patience': 2,
+    'threshold': 1e-3
+}
+
+@dataclass
+class TrainingState:
+    """Bundles all training objects and history."""
+    model: torch.nn.Module
+    optimizer: torch.optim.Optimizer
+    scheduler: torch.optim.lr_scheduler.LRScheduler
+    model_config: dict
+    scheduler_config: dict
+    start_epoch: int = 0
+    best_val_loss: float = float('inf')
+    train_history: list = field(default_factory=list)
+    val_history: list = field(default_factory=list)
+    lr_history: list = field(default_factory=list)
 
 def batch_fen_to_tensor(fens):
     batch_size = len(fens)
@@ -91,49 +120,72 @@ def get_chess_datasets(data_path, val_size=500_000, test_size=500_000, seed=42):
     
     return train_dataset, val_dataset, test_dataset
 
-
-def model_from_checkpoint(checkpoint):
-    def_model = TwoLayerMLP(layer1_width=1024, layer2_width=512)
-    def_config = {
-        'model_type': 'TwoLayerMLP',
-        'layer1_width': 1024,
-        'layer2_width': 512,
-        'dropout_rate': 0.2
-        } 
-    
-    if 'model_config' in checkpoint.keys():
-            config = checkpoint.get('model_config', {})
-            # Remove 'model_type' before unpacking the kwargs   
-            kwargs = {k: v for k, v in config.items() if k != 'model_type'}
-            if config.get('model_type') == 'TwoLayerMLP':                    
-                return TwoLayerMLP(**kwargs), config
-            
-            elif config.get('model_type') == 'ThreeLayerMLP':
-                return ThreeLayerMLP(**kwargs), config 
-            
-            elif config.get('model_type') == 'ChessCNN':
-                return ChessCNN(**kwargs), config
-    else:
-        # Fallback for old checkpoint
-        return def_model, def_config
-
-
 def get_data_loaders(data, batch_size):
     train_dataset, val_dataset, _ = get_chess_datasets(data)
 
     train_loader = DataLoader(
         train_dataset, batch_size=batch_size, shuffle=True, 
         num_workers=4, pin_memory=True, collate_fn=custom_collate
-        )
+    )
     val_loader = DataLoader(
         val_dataset, batch_size=4096, shuffle=False, 
         num_workers=4, pin_memory=True, collate_fn=custom_collate
-        )
+    )
     return train_loader, val_loader
 
-def write_record(checkpoint, tests_error):
-
-    config = [checkpoint.get('model_config')]
+def model_from_checkpoint(checkpoint, device='cpu'):
+    # Safely extract configuration or fall back to defaults
+    config = checkpoint.get('model_config', DEFAULT_CONFIG) if isinstance(checkpoint, dict) and 'model_config' in checkpoint else DEFAULT_CONFIG
     
-    print(df.shape)
+    kwargs = {k: v for k, v in config.items() if k != 'model_type'}
+    model_type = config.get('model_type', 'ThreeLayerMLP')
+    
+    if model_type == 'TwoLayerMLP':                    
+        model = TwoLayerMLP(**kwargs)
+    elif model_type == 'ThreeLayerMLP':
+        model = ThreeLayerMLP(**kwargs) 
+    elif model_type == 'ChessCNN':
+        model = ChessCNN(**kwargs)
+    else:
+        model = ThreeLayerMLP(**kwargs)
+        
+    # Move parameters to device BEFORE passing to optimizer
+    model = model.to(device)
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+    
+    scheduler_config = checkpoint.get('scheduler_config', DEFAULT_SCHEDULER) if isinstance(checkpoint, dict) else DEFAULT_SCHEDULER
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, **scheduler_config)
 
+    # Initialize standard State object
+    state = TrainingState(
+        model=model,
+        optimizer=optimizer,
+        scheduler=scheduler,
+        model_config=config,
+        scheduler_config=scheduler_config
+    )
+
+    # Hydrate the State object if weights exist
+    if isinstance(checkpoint, dict) and 'model_state_dict' in checkpoint:
+        model.load_state_dict(checkpoint['model_state_dict'])
+        
+        if 'optimizer_state_dict' in checkpoint:
+            optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+            
+        if 'scheduler_state_dict' in checkpoint:
+            scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
+
+        state.start_epoch = checkpoint.get('epoch', 0)
+        state.best_val_loss = checkpoint.get('best_val_loss', float('inf'))
+        state.train_history = checkpoint.get('train_loss_history', [])
+        state.val_history = checkpoint.get('val_loss_history', [])
+        state.lr_history = checkpoint.get('lr_history', [])
+        
+    elif isinstance(checkpoint, dict) and len(checkpoint) > 0 and 'epoch' not in checkpoint:
+        # Fallback for old raw state_dict checkpoints
+        try:
+            model.load_state_dict(checkpoint)
+        except Exception:
+            pass
+            
+    return state

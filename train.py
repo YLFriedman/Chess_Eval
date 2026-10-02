@@ -1,93 +1,9 @@
 import argparse
 import torch
 import torch.nn as nn
-
 import time
-from dataclasses import dataclass, field
 
-from models.mlp import ChessMLP, TwoLayerMLP, ThreeLayerMLP
 from utils import get_data_loaders, model_from_checkpoint
-
-DEFAULT_CONFIG = {
-    'model_type': 'ThreeLayerMLP',
-    'layer1_width': 2048,
-    'layer2_width': 1024,
-    'layer3_width' : 256,
-    'dropout_rate': 0.2
-}
-
-DEFAULT_SCHEDULER =  {
-    'mode' :'min', 
-    'factor':0.5, 
-    'patience':2,
-    'threshold' :1e-3
-}
-
-@dataclass
-class TrainingState:
-    """Bundles all training objects and history."""
-    model: nn.Module
-    optimizer: torch.optim.Optimizer
-    scheduler: torch.optim.lr_scheduler.LRScheduler
-    model_config: dict
-    scheduler_config: dict
-    start_epoch: int = 0
-    best_val_loss: float = float('inf')
-    train_history: list = field(default_factory=list)
-    val_history: list = field(default_factory=list)
-    lr_history: list = field(default_factory=list)
-
-
-def setup_resume(file_path, device):
-    """Loads all components from a checkpoint and returns a TrainingState."""
-
-    checkpoint = torch.load(file_path, map_location=device, weights_only=False)
-    model, model_config = model_from_checkpoint(checkpoint)  
-    model.to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
-
-    if isinstance(checkpoint, dict) and 'model_state_dict' in checkpoint:
-        # Fallback to defaults if scheduler config is missing from an old checkpoint
-        scheduler_config = checkpoint.get('scheduler_config', DEFAULT_SCHEDULER)
-        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, **scheduler_config)
-        
-        if 'scheduler_state_dict' in checkpoint:
-            scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
-            
-        model.load_state_dict(checkpoint['model_state_dict'])
-        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-        
-        return TrainingState(
-            model=model,
-            optimizer=optimizer,
-            scheduler=scheduler,
-            model_config=model_config,
-            scheduler_config=scheduler_config,
-            start_epoch=checkpoint.get('epoch', 0),
-            best_val_loss=checkpoint.get('best_val_loss', float('inf')),
-            train_history=checkpoint.get('train_loss_history', []),
-            val_history=checkpoint.get('val_loss_history', []),
-            lr_history=checkpoint.get('lr_history', [])
-        )
-    else:
-        raise ValueError("Invalid checkpoint format")
-    
-
-def setup_default(device):
-    """Initializes default model and optimizers from scratch."""
-    model = ThreeLayerMLP(**{k: v for k, v in DEFAULT_CONFIG.items() if k != 'model_type'})
-    model = model.to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, **DEFAULT_SCHEDULER) 
-    
-    return TrainingState(
-        model=model,
-        optimizer=optimizer,
-        scheduler=scheduler,
-        model_config=DEFAULT_CONFIG,
-        scheduler_config=DEFAULT_SCHEDULER
-    )
-
 
 def main():     
     parser = argparse.ArgumentParser(description="Train ChessMLP")
@@ -103,18 +19,20 @@ def main():
     # 1. Load Data
     train_loader, val_loader = get_data_loaders(args.data, args.batch_size)
     
-    # 2. Initialize Model, Optimizer, and Loss
+    # 2. Initialize Architecture via State Object
+    
     if args.resume:
-        state = setup_resume(f"checkpoints/{args.resume}", device)
+        checkpoint = torch.load(f"checkpoints/{args.resume}", map_location=device, weights_only=False)
+        state = model_from_checkpoint(checkpoint, device)
         print(f"Resumed from full checkpoint at epoch {state.start_epoch}.")
     else: 
-        state = setup_default(device)
+        # Passing an empty dict tells the function to fetch defaults from scratch
+        state = model_from_checkpoint({}, device)
 
     criterion = nn.MSELoss()
     model_name = type(state.model).__name__
     
     # 3. Training Loop
-    
     print("\nStarting training...")
     start_time = time.time()
 
