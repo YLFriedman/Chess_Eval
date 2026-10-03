@@ -3,9 +3,8 @@ import torch.nn as nn
 import numpy as np
 import argparse
 import matplotlib.pyplot as plt
-from torch.utils.data import DataLoader
 
-from utils import get_chess_datasets, custom_collate, model_from_checkpoint
+from utils import state_from_checkpoint, write_record, get_data_loaders
 
 def plot_loss(train_losses, val_losses, figpath):
     plt.figure(figsize=(10, 6))
@@ -28,34 +27,27 @@ def main():
     parser = argparse.ArgumentParser(description="Evaluate Chess Model")
     parser.add_argument("--figpath", type=str, default='loss_curve.png', help="file to save loss curve image to")
     parser.add_argument("--checkpoint", type=str, default='ThreeLayerMLP_best_model.pth', help="name of checkpoint file")
+    parser.add_argument("--record_file", type = str, default='model_performance.xlsx', help="name of record file")
+    parser.add_argument("-r", "--record", action="store_true", help="Save eval metrics to {record_file}")
     args = parser.parse_args()
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     print(f"Using device: {device}")
 
     # 1. Load Data (Extracting only the test set)
-    _, _, test_dataset = get_chess_datasets("data/chessData_cleaned.parquet")
+    _, _, test_loader = get_data_loaders("data/chessData_cleaned.parquet")
     
-    test_loader = DataLoader(
-        test_dataset, 
-        batch_size=4096, 
-        shuffle=False, 
-        num_workers=4, 
-        pin_memory=True,
-        collate_fn=custom_collate
-    )
 
     # 2. Load the trained model via State object
     print("Loading checkpoint...")
     checkpoint = torch.load(f'checkpoints/{args.checkpoint}', map_location=device, weights_only=False)
-    state = model_from_checkpoint(checkpoint, device)
+    state = state_from_checkpoint(checkpoint, device)
 
-    model = state.model
     criterion = nn.MSELoss()
-    model.eval()
+    state.model.eval()
 
     # 3. Evaluate Test Data
-    print(f"\nEvaluating on {len(test_dataset)} test samples...")
+    print(f"\nEvaluating on {len(test_loader.dataset)} test samples...")
     running_test_loss = 0.0
     
     with torch.no_grad():
@@ -63,14 +55,14 @@ def main():
             inputs = inputs.to(device)
             targets = targets.to(device)
             
-            outputs = model(inputs)
+            outputs = state.model(inputs)
             loss = criterion(outputs, targets)
             running_test_loss += loss.item() * inputs.size(0)
             
             if (batch_idx + 1) % 25 == 0:
                 print(f"Processed {batch_idx + 1}/{len(test_loader)} test batches...")
 
-    avg_test_loss = running_test_loss / len(test_dataset)
+    avg_test_loss = running_test_loss / len(test_loader.dataset)
     test_rmse = np.sqrt(avg_test_loss)
     
     print("\n--- FINAL TEST RESULTS ---")
@@ -86,6 +78,12 @@ def main():
         plot_loss(train_history, val_history, f'figures/{args.figpath}')
     else:
         print("\nNo loss history found in checkpoint to plot.")
+    
+    if args.record:
+        print(f"\nSaving run metrics to {args.record_file}...")
+        state.test_loss = avg_test_loss
+        write_record(state, args.record_file)
+        print("Record saved successfully.")
 
 if __name__ == '__main__':
     main()

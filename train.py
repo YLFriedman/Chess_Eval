@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import time
 
-from utils import get_data_loaders, model_from_checkpoint
+from utils import get_data_loaders, state_from_checkpoint
 
 def main():     
     parser = argparse.ArgumentParser(description="Train ChessMLP")
@@ -17,17 +17,17 @@ def main():
     print(f"Using device: {device}")
 
     # 1. Load Data
-    train_loader, val_loader = get_data_loaders(args.data, args.batch_size)
+    train_loader, val_loader, _ = get_data_loaders(args.data, args.batch_size)
     
     # 2. Initialize Architecture via State Object
     
     if args.resume:
         checkpoint = torch.load(f"checkpoints/{args.resume}", map_location=device, weights_only=False)
-        state = model_from_checkpoint(checkpoint, device)
+        state = state_from_checkpoint(checkpoint, device)
         print(f"Resumed from full checkpoint at epoch {state.start_epoch}.")
     else: 
         # Passing an empty dict tells the function to fetch defaults from scratch
-        state = model_from_checkpoint({}, device)
+        state = state_from_checkpoint({}, device)
 
     criterion = nn.MSELoss()
     model_name = type(state.model).__name__
