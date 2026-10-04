@@ -3,7 +3,6 @@ import torch
 import numpy as np
 import pandas as pd
 import gc
-from datetime import datetime
 from dataclasses import dataclass, field
 from torch.utils.data import random_split, DataLoader
 
@@ -43,6 +42,7 @@ class TrainingState:
     val_history: list = field(default_factory=list)
     lr_history: list = field(default_factory=list)
     test_loss: float = None
+    mlflow_run_id: str = None
 
 def batch_fen_to_tensor(fens):
     batch_size = len(fens)
@@ -188,6 +188,7 @@ def state_from_checkpoint(checkpoint, device='cpu'):
         state.train_history = checkpoint.get('train_loss_history', [])
         state.val_history = checkpoint.get('val_loss_history', [])
         state.lr_history = checkpoint.get('lr_history', [])
+        state.mlflow_run_id = checkpoint.get('mlflow_run_id', None)
         
     elif isinstance(checkpoint, dict) and len(checkpoint) > 0 and 'epoch' not in checkpoint:
         # Fallback for old raw state_dict checkpoints
@@ -197,82 +198,6 @@ def state_from_checkpoint(checkpoint, device='cpu'):
             pass
             
     return state
-
-def write_record(state: TrainingState, path: str):
-    """Appends the training run metrics to an Excel file"""
-    model_name = type(state.model).__name__
-    opt_name = type(state.optimizer).__name__
-    
-    # Format Layer Widths (e.g. "1024, 512, 256")
-    widths = [str(v) for k, v in state.model_config.items() if 'width' in k]
-    layer_width_str = ", ".join(widths)
-    
-    # Format Dropouts (handles single float or lists)
-    dropouts = state.model_config.get('dropout_rate', '')
-    if isinstance(dropouts, list):
-        dropout_str = ", ".join(map(str, dropouts))
-    else:
-        num_layers = len(widths)
-        dropout_str = ", ".join([str(dropouts)] * num_layers) if num_layers > 0 else str(dropouts)
-        
-    # Get Initial Learning Rate
-    lr = state.lr_history[0] if state.lr_history else state.optimizer.param_groups[0]['lr']
-    
-    # Get Scheduler Info
-    sched_name = type(state.scheduler).__name__ if state.scheduler else 'None'
-    patience = state.scheduler_config.get('patience', '')
-    ratio = state.scheduler_config.get('factor', '')
-    threshold = state.scheduler_config.get('threshold', '')
-    
-    # Run Identifier
-    run_id = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    
-    # 1. Create the 'Runs' dataframe
-    runs_new = pd.DataFrame([{
-        'Model': model_name,
-        'Optimizer': opt_name,
-        'Layer Width': layer_width_str,
-        'LayerDropout': dropout_str,
-        'Learning rate': lr,
-        'Sched Type': sched_name,
-        'Sched Patience': patience,
-        'Sched Ratio': ratio,
-        'Sched Threshold': threshold,
-        'Run_ID': run_id,
-        'Test Loss': state.test_loss
-    }])
-    
-    # 2. Create the 'Epochs' dataframe
-    epochs_new = pd.DataFrame({
-        'Run_Id': run_id,
-        'Epoch #': range(1, len(state.train_history) + 1),
-        'Train Loss': state.train_history,
-        'Validation Loss': state.val_history,
-        'LR': state.lr_history
-    })
-    
-    # 3. Safely read and append if file exists
-    if os.path.exists(path):
-        try:
-            runs_existing = pd.read_excel(path, sheet_name='Runs')
-            runs_df = pd.concat([runs_existing, runs_new], ignore_index=True)
-        except Exception:
-            runs_df = runs_new
-            
-        try:
-            epochs_existing = pd.read_excel(path, sheet_name='Epochs')
-            epochs_df = pd.concat([epochs_existing, epochs_new], ignore_index=True)
-        except Exception:
-            epochs_df = epochs_new
-    else:
-        runs_df = runs_new
-        epochs_df = epochs_new
-        
-    # 4. Write back to disk
-    with pd.ExcelWriter(path, engine='xlsxwriter') as writer:
-        runs_df.to_excel(writer, sheet_name='Runs', startrow=1, header=False, index=False)
-        epochs_df.to_excel(writer, sheet_name='Epochs', startrow=1, header=False, index=False)
-
 
 
 

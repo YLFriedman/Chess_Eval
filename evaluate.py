@@ -3,8 +3,9 @@ import torch.nn as nn
 import numpy as np
 import argparse
 import matplotlib.pyplot as plt
+import mlflow
 
-from utils import state_from_checkpoint, write_record, get_data_loaders
+from utils import state_from_checkpoint, get_data_loaders
 
 def plot_loss(train_losses, val_losses, figpath):
     plt.figure(figsize=(10, 6))
@@ -27,8 +28,6 @@ def main():
     parser = argparse.ArgumentParser(description="Evaluate Chess Model")
     parser.add_argument("--figpath", type=str, default='loss_curve.png', help="file to save loss curve image to")
     parser.add_argument("--checkpoint", type=str, default='ThreeLayerMLP_best_model.pth', help="name of checkpoint file")
-    parser.add_argument("--record_file", type = str, default='model_performance.xlsx', help="name of record file")
-    parser.add_argument("-r", "--record", action="store_true", help="Save eval metrics to {record_file}")
     args = parser.parse_args()
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -69,6 +68,16 @@ def main():
     print(f"Test MSE:  {avg_test_loss:.5f}")
     print(f"Test RMSE: {test_rmse:.5f} (~{test_rmse * 1000:.1f} centipawns)")
 
+    # 4. Log to MLflow
+    if state.mlflow_run_id:
+        print(f"\nAppending test metrics to MLflow Run: {state.mlflow_run_id}...")
+        mlflow.set_tracking_uri("sqlite:///mlflow.db")
+        mlflow.set_experiment("Chess_Architecture_Search")
+        
+        with mlflow.start_run(run_id=state.mlflow_run_id):
+            mlflow.log_metric("test_loss", avg_test_loss)
+            mlflow.log_metric("test_rmse", test_rmse)
+
     # 4. Plot the Loss Curve
     train_history = state.train_history
     val_history = state.val_history
@@ -79,11 +88,6 @@ def main():
     else:
         print("\nNo loss history found in checkpoint to plot.")
     
-    if args.record:
-        print(f"\nSaving run metrics to {args.record_file}...")
-        state.test_loss = avg_test_loss
-        write_record(state, args.record_file)
-        print("Record saved successfully.")
 
 if __name__ == '__main__':
     main()
