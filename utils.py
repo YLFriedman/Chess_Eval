@@ -16,14 +16,14 @@ CASTLING = ['K', 'Q', 'k', 'q']
 DEFAULT_CONFIG = {
     'model_type': 'ChessCNN',
     'mlp_hidden': 512,
-    'dropout_rate': 0.2
+    'dropout_rate': 0.1
 }
 
 DEFAULT_SCHEDULER = {
     'mode': 'min', 
     'factor': 0.5, 
-    'patience': 2,
-    'threshold': 1e-3
+    'patience': 4,
+    'threshold': 1e-4
 }
 
 @dataclass
