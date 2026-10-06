@@ -15,7 +15,8 @@ CASTLING = ['K', 'Q', 'k', 'q']
 
 DEFAULT_CONFIG = {
     'model_type': 'ChessCNN',
-    'mlp_hidden': 512,
+    'mlp_hidden1': 512,
+    'mlp_hidden2': 128,
     'dropout_rate': 0.1
 }
 
