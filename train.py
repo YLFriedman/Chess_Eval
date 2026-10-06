@@ -55,6 +55,8 @@ def main():
     print("\nStarting training...")
     start_time = time.time()
 
+    scaler = torch.amp.GradScaler('cuda')
+
     try:
         for epoch in range(state.start_epoch, args.epochs):
             state.model.train()
@@ -72,14 +74,17 @@ def main():
             }
             
             for batch_idx, (inputs, targets) in enumerate(train_loader):
-                inputs = inputs.to(device)
-                targets = targets.to(device)
+                inputs = inputs.to(device, non_blocking=True)
+                targets = targets.to(device, non_blocking=True)
                 
-                state.optimizer.zero_grad()
-                outputs = state.model(inputs)
-                loss = criterion(outputs, targets)
-                loss.backward()
-                state.optimizer.step()
+                state.optimizer.zero_grad(set_to_none=True)
+                with torch.autocast(device_type='cuda', dtype=torch.float16):
+                    outputs = state.model(inputs)
+                    loss = criterion(outputs, targets)
+                
+                scaler.scale(loss).backward()
+                scaler.step(state.optimizer)
+                scaler.update()
                 
                 running_train_loss += loss.item() * inputs.size(0)
                 
