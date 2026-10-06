@@ -26,8 +26,8 @@ def plot_loss(train_losses, val_losses, figpath):
 def main():
 
     parser = argparse.ArgumentParser(description="Evaluate Chess Model")
-    parser.add_argument("--figpath", type=str, default='loss_curve.png', help="file to save loss curve image to")
-    parser.add_argument("--checkpoint", type=str, default='ThreeLayerMLP_best_model.pth', help="name of checkpoint file")
+    parser.add_argument("--figpath", type=str, default='CNN_loss_curve.png', help="file to save loss curve image to")
+    parser.add_argument("--checkpoint", type=str, default='ChessCNN_best_model.pth', help="name of checkpoint file")
     args = parser.parse_args()
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -84,7 +84,7 @@ def main():
     
     if train_history and val_history:
         print("\nGenerating loss curve graph...")
-        plot_loss(train_history, val_history, f'figures/{args.figpath}')
+        plot_loss(train_history, val_history, f'figures/loss_curves/{args.figpath}')
     else:
         print("\nNo loss history found in checkpoint to plot.")
     

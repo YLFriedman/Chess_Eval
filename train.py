@@ -11,7 +11,8 @@ def main():
     parser.add_argument("--data", type=str, default="data/chessData_cleaned.parquet", help="Path to parquet data")
     parser.add_argument("--epochs", type=int, default=10, help="Total number of epochs to train")
     parser.add_argument("--batch_size", type=int, default=1024, help="Training batch size")
-    parser.add_argument("--resume", type=str, default='ThreeLayerMLP_best_model.pth', help="Name of checkpoint file to resume from")
+    parser.add_argument("--resume", action='store_true', help="Resume mode")
+    parser.add_argument("--resume_file", type=str, default="ChessCNN_best_model.pth", help="Path to resume checkpoint")
     args = parser.parse_args()
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -22,7 +23,7 @@ def main():
     
     # 2. Initialize Architecture via State Object
     if args.resume:
-        checkpoint = torch.load(f"checkpoints/{args.resume}", map_location=device, weights_only=False)
+        checkpoint = torch.load(f"checkpoints/{args.resume_file}", map_location=device, weights_only=False)
         state = state_from_checkpoint(checkpoint, device)
         print(f"Resumed from full checkpoint at epoch {state.start_epoch}.")
     else: 

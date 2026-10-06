@@ -14,10 +14,8 @@ PIECES = ['P', 'N', 'B', 'R', 'K', 'Q', 'p', 'n', 'b', 'r', 'k', 'q']
 CASTLING = ['K', 'Q', 'k', 'q']
 
 DEFAULT_CONFIG = {
-    'model_type': 'ThreeLayerMLP',
-    'layer1_width': 2048,
-    'layer2_width': 1024,
-    'layer3_width' : 256,
+    'model_type': 'ChessCNN',
+    'mlp_hidden': 512,
     'dropout_rate': 0.2
 }
 
@@ -61,7 +59,8 @@ def batch_fen_to_tensor(fens):
         
     boards = [b.replace('/', '') for b in boards]
     board_arr = np.array(boards, dtype='S64').view('S1').reshape(batch_size, 8, 8)
-    tens = np.zeros((batch_size, 18, 8, 8), dtype=np.float32)
+    
+    tens = np.zeros((batch_size, 20, 8, 8), dtype=np.float32)
     
     for channel, piece in enumerate(PIECES):
         tens[:, channel, :, :] = (board_arr == piece.encode())
@@ -83,6 +82,12 @@ def batch_fen_to_tensor(fens):
         cols = ep_bytes[:, 0].view(np.uint8) - ord('a')
         rows = 8 - (ep_bytes[:, 1].view(np.uint8) - ord('0'))
         tens[valid_ep_idx, 17, rows, cols] = 1
+
+    files = np.linspace(0, 1, 8, dtype=np.float32)
+    tens[:, 18, :, :] = files.reshape(1, 1, 8)
+    
+    ranks = np.linspace(0, 1, 8, dtype=np.float32)
+    tens[:, 19, :, :] = ranks.reshape(1, 8, 1)
 
     return torch.from_numpy(tens)
 
@@ -159,7 +164,7 @@ def state_from_checkpoint(checkpoint, device='cpu'):
         
     # Move parameters to device BEFORE passing to optimizer
     model = model.to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+    optimizer = torch.optim.Adam(model.parameters(), lr=3e-4)
     
     scheduler_config = checkpoint.get('scheduler_config', DEFAULT_SCHEDULER) if isinstance(checkpoint, dict) else DEFAULT_SCHEDULER
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, **scheduler_config)
