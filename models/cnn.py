@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 
 class ChessCNN(nn.Module):
-    def __init__(self, mlp_hidden1=512, mlp_hidden2=128, dropout_rate=0.1):
+    def __init__(self, mlp_hidden1=512, mlp_hidden2=128, dropout_rate=0.2):
         super().__init__()
         
         self.conv_stack = nn.Sequential(
@@ -33,7 +33,7 @@ class ChessCNN(nn.Module):
         
         # 64 channels * 8 rows * 8 cols = 4096 input features
         self.mlp = nn.Sequential(
-            # Stage 1: Large transition layer with light dropout
+            # Stage 1: Large transition layer with dropout
             nn.Linear(4096, mlp_hidden1),
             nn.ReLU(),
             nn.Dropout(dropout_rate),

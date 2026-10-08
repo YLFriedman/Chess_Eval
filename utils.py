@@ -17,13 +17,13 @@ DEFAULT_CONFIG = {
     'model_type': 'ChessCNN',
     'mlp_hidden1': 512,
     'mlp_hidden2': 128,
-    'dropout_rate': 0.1
+    'dropout_rate': 0.2
 }
 
 DEFAULT_SCHEDULER = {
     'mode': 'min', 
     'factor': 0.5, 
-    'patience': 4,
+    'patience': 2,
     'threshold': 1e-4
 }
 
@@ -84,10 +84,10 @@ def batch_fen_to_tensor(fens):
         rows = 8 - (ep_bytes[:, 1].view(np.uint8) - ord('0'))
         tens[valid_ep_idx, 17, rows, cols] = 1
 
-    files = np.linspace(0, 1, 8, dtype=np.float32)
+    files = np.linspace(-1, 1, 8, dtype=np.float32)
     tens[:, 18, :, :] = files.reshape(1, 1, 8)
     
-    ranks = np.linspace(0, 1, 8, dtype=np.float32)
+    ranks = np.linspace(-1, 1, 8, dtype=np.float32)
     tens[:, 19, :, :] = ranks.reshape(1, 8, 1)
 
     return torch.from_numpy(tens)

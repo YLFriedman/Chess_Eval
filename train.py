@@ -145,9 +145,10 @@ def main():
                 state.best_val_loss = avg_val_loss
                 checkpoint_dict['best_val_loss'] = state.best_val_loss
                 torch.save(checkpoint_dict, f'checkpoints/{model_name}_best_model.pth')
-                print("--> Validation loss improved! Saved optimal model checkpoint.")
+                print("--> Validation loss improved! Saved optimal model checkpoint...")
             
             # Always save latest model
+            print("Saving latest model...")
             torch.save(checkpoint_dict, f"checkpoints/{model_name}_latest_model.pth")
         
         end_time = time.time()
@@ -156,7 +157,15 @@ def main():
         minutes, seconds = divmod(rem, 60)
         
         print(f"\nTraining complete in {int(hours)}h {int(minutes)}m {seconds:.2f}s.")
-        
+    
+    except KeyboardInterrupt:
+        print("\n\n[-] Training manually interrupted by user (Ctrl+C).")
+        end_time = time.time()
+        elapsed_seconds = end_time - start_time
+        hours, rem = divmod(elapsed_seconds, 3600)
+        minutes, seconds = divmod(rem, 60)
+        print(f"\nTraining Runtime: {int(hours)}h {int(minutes)}m {seconds:.2f}s.")
+
     finally:
         # Ensures the run gracefully ends even if you manual interrupt (Ctrl+C)
         mlflow.end_run()
